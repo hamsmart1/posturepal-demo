@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PosturePal Enterprise — Corporate Ergonomics AI</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"IBM Plex Sans Thai"', 'sans-serif'],
+                        heading: ['Syne', 'sans-serif'],
+                        mono: ['"DM Mono"', 'monospace'],
+                    },
+                    colors: {
+                        ink: { 50:'#f5f6fa', 100:'#eaecf5', 200:'#d0d5e8', 300:'#a8b0cc', 400:'#6b7aab', 500:'#3d4f8a', 600:'#2c3a6e', 700:'#1e2750', 800:'#131a38', 900:'#0b1024' },
+                        accent: { 400:'#5b8af5', 500:'#3b6ff0', 600:'#2554d4' },
+                        good: '#10b981', warn: '#f59e0b', bad: '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'IBM Plex Sans Thai', sans-serif; background: #0b1024; color: #e2e6f3; }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2c3a6e; border-radius: 3px; }
+
+        /* Auth */
+        #auth-screen {
+            position: fixed; inset: 0; z-index: 200;
+            background: radial-gradient(ellipse at 30% 60%, #1a2550 0%, #0b1024 70%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-card {
+            background: rgba(19,26,56,0.8);
+            border: 1px solid rgba(91,138,245,0.2);
+            backdrop-filter: blur(24px);
+            border-radius: 20px;
+            padding: 48px 44px;
+            width: 100%; max-width: 420px;
+            box-shadow: 0 32px 64px rgba(0,0,0,0.5);
+        }
+        .auth-input {
+            width: 100%; padding: 12px 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(91,138,245,0.25);
+            border-radius: 10px; color: #e2e6f3;
+            font-family: inherit; font-size: 14px;
+            outline: none; transition: border-color 0.2s;
+        }
+        .auth-input:focus { border-color: #3b6ff0; }
+        .auth-btn {
+            width: 100%; padding: 13px;
+            background: #3b6ff0; border: none; border-radius: 10px;
+            color: white; font-family: inherit; font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s, transform 0.1s;
+        }
+        .auth-btn:hover { background: #2554d4; }
+        .auth-btn:active { transform: scale(0.98); }
+
+        /* Layout */
+        #main-app { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px; flex-shrink: 0;
+            background: #0e1530;
+            border-right: 1px solid rgba(91,138,245,0.1);
+            display: flex; flex-direction: column;
+            z-index: 20;
+        }
+        .sidebar-logo {
+            padding: 24px 20px 20px;
+            border-bottom: 1px solid rgba(91,138,245,0.1);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .logo-icon {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: linear-gradient(135deg, #3b6ff0, #5b8af5);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+        }
+        .sidebar nav { padding: 16px 12px; flex: 1; overflow-y: auto; }
+        .nav-link {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; border-radius: 10px;
+            font-size: 13.5px; font-weight: 500;
+            color: #6b7aab; cursor: pointer; text-decoration: none;
+            transition: all 0.15s; margin-bottom: 2px;
+            border: 1px solid transparent;
+        }
+        .nav-link:hover { background: rgba(91,138,245,0.08); color: #a8b0cc; }
+        .nav-link.active { 
+            background: rgba(59,111,240,0.15); color: #7aabff; 
+            border-color: rgba(59,111,240,0.3);
+        }
+        .nav-link .ph { font-size: 17px; }
+        .sidebar-footer { padding: 16px 12px; border-top: 1px solid rgba(91,138,245,0.1); }
+        .logout-btn {
+            width: 100%; padding: 9px;
+            display: flex; align-items: center; justify-content: center; gap-8px;
+            gap: 8px;
+            border: 1px solid rgba(91,138,245,0.15);
+            border-radius: 8px; background: transparent;
+            color: #6b7aab; font-size: 12px; font-family: inherit;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .logout-btn:hover { border-color: rgba(239,68,68,0.4); color: #ef4444; }
+
+        /* Main */
+        .main-area {
+            flex: 1; min-width: 0;
+            display: flex; flex-direction: column; overflow: hidden;
+            background: #0f1628;
+        }
+        .topbar {
+            height: 64px; flex-shrink: 0;
+            background: #0e1530;
+            border-bottom: 1px solid rgba(91,138,245,0.1);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 28px;
+        }
+        .topbar-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; color: #e2e6f3; }
+        .status-badge {
+            display: flex; align-items: center; gap: 7px;
+            padding: 6px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+            color: #6b7aab;
+        }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #374151; transition: background 0.3s; }
+        .status-dot.online { background: #10b981; box-shadow: 0 0 8px #10b981; animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+        /* Content area */
+        #content-area { flex: 1; overflow-y: auto; padding: 28px; }
+
+        /* Cards */
+        .card {
+            background: #141d3b;
+            border: 1px solid rgba(91,138,245,0.12);
+            border-radius: 14px;
+        }
+        .card-header {
+            padding: 18px 22px 14px;
+            border-bottom: 1px solid rgba(91,138,245,0.08);
+            font-family: 'DM Mono', monospace; font-size: 10px;
+            letter-spacing: 0.1em; color: #6b7aab; text-transform: uppercase;
+        }
+
+        /* Stats */
+        .stat-card {
+            background: #141d3b;
+            border: 1px solid rgba(91,138,245,0.12);
+            border-radius: 14px;
+	    padding: 22px;
+
+        }
+        .stat-label { font-family: 'IBM Plex Sans Thai', sans-serif; 
+    font-size: 14px; 
+    font-weight: 600; 
+    color: #6b7aab; }
+        .stat-value { font-family: 'IBM Plex Sans Thai', sans-serif; 
+    font-size: 36px; 
+    font-weight: 800; 
+    color: #e2e6f3; 
+    margin-top: 4px; 
+    letter-spacing: -0.03em; }
+
+        /* Toggle switch */
+        .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+        .toggle-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+        .toggle { position: relative; width: 34px; height: 18px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: rgba(255,255,255,0.1); border-radius: 9px;
+            transition: background 0.2s;
+        }
+        .toggle-slider::before {
+            content: ''; position: absolute;
+            width: 12px; height: 12px; border-radius: 50%;
+            top: 3px; left: 3px;
+            background: white; transition: transform 0.2s;
+        }
+        .toggle input:checked + .toggle-slider { background: #3b6ff0; }
+        .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+        .toggle input:checked + .toggle-slider.amber { background: #f59e0b; }
+        .toggle input:checked + .toggle-slider.green { background: #10b981; }
+
+        /* Camera */
+        .camera-container {
+            position: relative; width: 100%; aspect-ratio: 16/9;
+            background: #0b1024; border-radius: 12px; overflow: hidden;
+            border: 1px solid rgba(91,138,245,0.15);
+        }
+        .input_video { display: none; }
+        .output_canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; transform: scaleX(-1);
+        }
+        #cam-off-overlay {
+            position: absolute; inset: 0; z-index: 10;
+            background: #0b1024;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: #3b6ff0; border: none; border-radius: 10px;
+            color: white; font-family: inherit; font-size: 14px; font-weight: 600;
+            padding: 12px 20px; cursor: pointer; transition: all 0.15s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary:hover { background: #2554d4; }
+        .btn-primary.danger { background: #ef4444; }
+        .btn-primary.danger:hover { background: #dc2626; }
+        .btn-secondary {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(91,138,245,0.2);
+            border-radius: 10px; color: #6b7aab;
+            font-family: inherit; font-size: 14px; font-weight: 500;
+            padding: 12px 20px; cursor: pointer; transition: all 0.15s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-secondary:hover:not(:disabled) { border-color: #3b6ff0; color: #7aabff; }
+        .btn-secondary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        /* Progress bar */
+        .progress-track {
+            width: 100%; background: rgba(255,255,255,0.06);
+            border-radius: 4px; height: 6px; overflow: hidden;
+        }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+
+        /* Alert Options */
+        .alert-opt {
+            display: flex; flex-direction: column;
+            border: 1px solid rgba(91,138,245,0.15);
+            border-radius: 12px; padding: 18px 20px;
+            cursor: pointer; transition: all 0.2s;
+            background: rgba(255,255,255,0.02);
+        }
+        .alert-opt:hover { border-color: rgba(91,138,245,0.4); }
+        .alert-opt.active { 
+            border-color: #3b6ff0; 
+            background: rgba(59,111,240,0.1);
+        }
+        .alert-opt-title { font-weight: 700; font-size: 14px; color: #c8d0e8; display: flex; align-items: center; gap: 8px; }
+        .alert-opt-desc { font-size: 11px; color: #6b7aab; margin-top: 6px; }
+
+        /* Settings select */
+        .settings-select {
+            padding: 9px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(91,138,245,0.2);
+            border-radius: 8px; color: #c8d0e8;
+            font-family: inherit; font-size: 13px;
+            outline: none; cursor: pointer;
+        }
+        .settings-select:focus { border-color: #3b6ff0; }
+
+        /* Nudge blur overlay */
+        .app-nudge-blur { filter: blur(14px) brightness(0.6); pointer-events: none; transition: filter 0.6s; }
+
+        /* Full screen alert */
+        #full-alert {
+            position: fixed; inset: 0; z-index: 150;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; opacity: 0;
+            transition: opacity 0.4s;
+        }
+        #full-alert.show { opacity: 1; }
+        .alert-pill {
+            background: rgba(239,68,68,0.95);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 20px; padding: 20px 36px;
+            display: flex; align-items: center; gap: 16px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(239,68,68,0.4);
+        }
+
+        /* Screen flash for screen light */
+        #screen-flash {
+            position: fixed; inset: 0; z-index: 90;
+            background: white; opacity: 0; pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        #screen-flash.on { opacity: 0.18; }
+
+        /* Live status ring */
+        .status-ring {
+            width: 72px; height: 72px; border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto; transition: border-color 0.3s;
+        }
+        .status-ring.good { border-color: rgba(16,185,129,0.5); }
+        .status-ring.warn { border-color: rgba(245,158,11,0.5); }
+        .status-ring.bad { border-color: rgba(239,68,68,0.5); }
+
+        /* Notification toast */
+        #toast {
+            position: fixed; top: 20px; right: 20px; z-index: 999;
+            background: #141d3b; border: 1px solid rgba(91,138,245,0.3);
+            border-radius: 12px; padding: 14px 20px;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px; color: #c8d0e8;
+            transform: translateY(-100px); opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+        #toast.show { transform: translateY(0); opacity: 1; }
+
+        /* View hidden */
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        #view-monitoring.active { display: flex; flex-direction: column; }
+
+        /* Chart canvas */
+        #corpChart { max-height: 280px; }
+
+        /* PDF template off-screen */
+        #pdf-template {
+            position: absolute; left: -9999px; top: 0;
+            width: 800px; padding: 48px;
+            background: white; color: #0b1024;
+            font-family: sans-serif;
+        }
+        #pdf-template h1 { color: #1e2750; font-size: 26px; margin-bottom: 4px; }
+        #pdf-template .pdf-meta { color: #6b7aab; font-size: 13px; margin-bottom: 28px; }
+        #pdf-template .pdf-section { border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; }
+        #pdf-template .pdf-section h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7aab; margin-bottom: 12px; }
+        #pdf-template .pdf-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+        #pdf-template .pdf-row:last-child { border-bottom: none; }
+        #pdf-template .pdf-val { font-weight: 700; color: #1e2750; }
+
+        /* Animated scan line on camera */
+        @keyframes scanline { 0%{top:0%} 100%{top:100%} }
+        .scan-line {
+            position: absolute; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(59,111,240,0.6), transparent);
+            z-index: 5; pointer-events: none;
+            animation: scanline 3s linear infinite;
+        }
+
+        /* Tips box */
+        .tips-box {
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.2);
+            border-radius: 10px; padding: 14px 16px;
+            font-size: 12px; line-height: 1.6; color: #c8a65a;
+        }.hidden {
+    display: none !important;
+}
+    </style>
+</head>
+<body>
+
+<div id="screen-flash"></div>
+<div id="toast"><i class="ph ph-check-circle text-emerald-400"></i> <span id="toast-msg">บันทึกแล้ว</span></div>
+
+<!-- AUTH -->
+<div id="auth-screen">
+    <div class="auth-card">
+        <div style="text-align:center; margin-bottom:32px;">
+            <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#3b6ff0,#5b8af5);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;">
+                <i class="ph-fill ph-person-simple-walk" style="color:white;"></i>
+            </div>
+            <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#e2e6f3;margin-bottom:6px;">PosturePal</h1>
+            <p style="color:#6b7aab;font-size:13px;">Corporate Ergonomics Platform</p>
+        </div>
+        <form id="login-form" style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:#6b7aab;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Email</label>
+                <input type="email" id="user-email" value="employee@company.com" class="auth-input" placeholder="your@company.com" required>
+            </div>
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:#6b7aab;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">Password</label>
+                <input type="password" value="••••••••" class="auth-input" placeholder="Password">
+            </div>
+            <button type="submit" class="auth-btn" style="margin-top:4px;">Sign In</button>
+        </form>
+        <p style="text-align:center;font-size:11px;color:#6b7aab;margin-top:20px;">Secured by PosturePal Enterprise SSO</p>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" class="hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-icon"><i class="ph-fill ph-person-simple-walk" style="color:white;font-size:18px;"></i></div>
+            <div>
+                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:#e2e6f3;line-height:1;">PosturePal</div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:#6b7aab;letter-spacing:0.08em;margin-top:3px;">ENTERPRISE v2.0</div>
+            </div>
+        </div>
+        <nav>
+            <a data-view="dashboard" class="nav-link active">
+                <i class="ph ph-squares-four"></i> แดชบอร์ด
+            </a>
+            <a data-view="monitoring" class="nav-link">
+                <i class="ph ph-webcam"></i> กล้อง AI Vision
+            </a>
+            <a data-view="settings" class="nav-link">
+                <i class="ph ph-gear-six"></i> ตั้งค่าระบบเตือน
+            </a>
+            <a data-view="reports" class="nav-link">
+                <i class="ph ph-file-pdf"></i> รายงานสุขภาพ
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#3b6ff0,#5b8af5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;flex-shrink:0;" id="user-avatar">E</div>
+                <div style="min-width:0;">
+                    <div style="font-size:12px;font-weight:600;color:#c8d0e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="user-name-display">Employee</div>
+                    <div style="font-size:10px;color:#6b7aab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="user-email-display">employee@company.com</div>
+                </div>
+            </div>
+            <button class="logout-btn" id="btn-logout"><i class="ph ph-sign-out"></i> Sign Out</button>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main-area">
+        <div class="topbar">
+            <div class="topbar-title" id="page-title">แดชบอร์ด</div>
+            <div class="status-badge">
+                <span class="status-dot" id="top-status-dot"></span>
+                <span id="top-status-text" style="font-family:'DM Mono',monospace;">AI OFFLINE</span>
+            </div>
+        </div>
+
+        <div id="content-area" style="flex:1;overflow-y:auto;padding:24px;">
+
+            <!-- DASHBOARD VIEW -->
+            <div id="view-dashboard" class="view-section active" style="max-width:1200px;margin:0 auto;">
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
+                    <div class="stat-card">
+                        <div class="stat-label">Posture Score</div>
+                        <div class="stat-value">85%</div>
+                        <div style="margin-top:10px;" class="progress-track"><div class="progress-fill" style="width:85%;background:#3b6ff0;"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Monitor Time</div>
+                        <div class="stat-value" id="dash-monitor-time">0h 00m</div>
+                        <div style="font-size:11px;color:#6b7aab;margin-top:6px;">วันนี้</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Alerts Today</div>
+                        <div class="stat-value" id="dash-alert-count" style="color:#ef4444;">0</div>
+                        <div style="font-size:11px;color:#6b7aab;margin-top:6px;">ครั้งที่ถูกเตือน</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Weekly Posture Score History</div>
+                    <div style="padding:20px 22px;">
+                        <canvas id="corpChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MONITORING VIEW -->
+            <div id="view-monitoring" class="view-section" style="max-width:1200px;margin:0 auto;height:calc(100vh - 64px - 48px);">
+                <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;height:100%;">
+
+                    <!-- Camera Panel -->
+                    <div class="card" style="display:flex;flex-direction:column;overflow:hidden;">
+                        <!-- Toolbar -->
+                        <div style="padding:12px 16px;border-bottom:1px solid rgba(91,138,245,0.08);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.15);">
+                            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                                <div class="toggle-wrap">
+                                    <label class="toggle"><input type="checkbox" id="bg-blur-toggle" checked><span class="toggle-slider"></span></label>
+                                    <span class="toggle-label" style="color:#6b7aab;">Privacy Blur</span>
+                                </div>
+                                <div class="toggle-wrap">
+                                    <label class="toggle"><input type="checkbox" id="debug-toggle"><span class="toggle-slider green"></span></label>
+                                    <span class="toggle-label" style="color:#6b7aab;">Debug Labels</span>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                                <div class="toggle-wrap">
+                                    <label class="toggle"><input type="checkbox" id="low-light-boost"><span class="toggle-slider amber"></span></label>
+                                    <span class="toggle-label" style="color:#f59e0b;">Low-Light Boost</span>
+                                </div>
+                                <div class="toggle-wrap">
+                                    <label class="toggle"><input type="checkbox" id="screen-light-toggle"><span class="toggle-slider" style=""></span></label>
+                                    <span class="toggle-label" style="color:#5b8af5;">Screen Light</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera -->
+                        <div style="padding:16px;flex:1;display:flex;flex-direction:column;background:#0b1024;">
+                            <div class="camera-container" style="flex:1;height:auto;">
+                                <video class="input_video" playsinline></video>
+                                <canvas class="output_canvas" id="pose-canvas"></canvas>
+                                <div class="scan-line" id="scan-line" style="display:none;"></div>
+                                <div id="cam-off-overlay">
+                                    <i class="ph ph-video-camera-slash" style="font-size:40px;color:#2c3a6e;"></i>
+                                    <p style="color:#6b7aab;font-size:13px;font-weight:500;">กล้องปิดอยู่</p>
+                                    <p id="cam-loading-text" style="color:#3b6ff0;font-size:11px;display:none;margin-top:4px;">
+                                        <i class="ph ph-spinner"></i> กำลังโหลด AI Model...
+                                    </p>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:14px;">
+                                <button class="btn-primary" id="btn-toggle-cam" style="flex:1;">
+                                    <i class="ph-bold ph-power"></i> เปิดกล้อง
+                                </button>
+                                <button class="btn-secondary" id="btn-calibrate" disabled style="flex:1;">
+                                    <i class="ph-bold ph-crosshair"></i> ตั้งค่า Baseline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Side Panel -->
+                    <div style="display:flex;flex-direction:column;gap:14px;overflow-y:auto;">
+
+                        <!-- Live Analysis -->
+                        <div class="card" style="padding:20px;text-align:center;">
+                            <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#6b7aab;text-transform:uppercase;text-align:left;margin-bottom:16px;">Live Analysis</div>
+                            <div class="status-ring" id="status-ring">
+                                <i id="live-status-icon" class="ph-fill ph-minus" style="font-size:28px;color:#374151;"></i>
+                            </div>
+                            <div id="live-status-title" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:#c8d0e8;margin-top:12px;">Standby</div>
+
+                            <div style="margin-top:20px;text-align:left;">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                                    <span style="font-size:11px;color:#6b7aab;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;">FHP Deviation</span>
+                                    <span id="deviation-value" style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#e2e6f3;">0%</span>
+                                </div>
+                                <div class="progress-track"><div class="progress-fill" id="deviation-bar" style="width:0%;background:#3b6ff0;"></div></div>
+                            </div>
+                        </div>
+
+                        <!-- Session Stats -->
+                        <div class="card" style="padding:18px;">
+                            <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#6b7aab;text-transform:uppercase;margin-bottom:14px;">Session</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                                <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+                                    <div style="font-size:10px;color:#6b7aab;">Good Frames</div>
+                                    <div id="sess-good" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#10b981;">0</div>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;">
+                                    <div style="font-size:10px;color:#6b7aab;">Bad Frames</div>
+                                    <div id="sess-bad" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#ef4444;">0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tips -->
+                        <div class="tips-box">
+                            <strong><i class="ph ph-lightbulb"></i> Tips:</strong> หากแสงในห้องน้อย AI อาจจับจุดหูไม่ติด
+                            เปิด <strong>Screen Light</strong> เพื่อใช้แสงหน้าจอช่วยส่องใบหน้าครับ
+                        </div>
+
+                        <!-- Calibration Guide -->
+                        <div class="card" style="padding:16px;">
+                            <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;color:#6b7aab;text-transform:uppercase;margin-bottom:12px;">How to Calibrate</div>
+                            <ol style="font-size:12px;color:#a8b0cc;line-height:1.8;padding-left:16px;">
+                                <li>นั่งท่าที่ถูกต้อง หลังตรง</li>
+                                <li>กด "เปิดกล้อง" รอ AI โหลด</li>
+                                <li>กด "ตั้งค่า Baseline"</li>
+                                <li>ระบบจะตรวจจับท่าที่ดีให้อัตโนมัติ</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS VIEW -->
+            <div id="view-settings" class="view-section" style="max-width:700px;margin:0 auto;">
+                <div class="card">
+                    <div class="card-header" style="padding:18px 22px;">ตั้งค่าการแจ้งเตือน</div>
+                    <div style="padding:24px;display:flex;flex-direction:column;gap:24px;">
+                        <!-- Alert Mode -->
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:#c8d0e8;margin-bottom:14px;">รูปแบบการเตือน (Alert Mode)</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <label class="alert-opt active" data-alert="blur">
+                                    <input type="radio" name="alertType" value="blur" class="sr-only" checked style="position:absolute;opacity:0;">
+                                    <div class="alert-opt-title"><i class="ph ph-eye-slash"></i> Visual Blur</div>
+                                    <div class="alert-opt-desc">หน้าจอจะเบลออัตโนมัติเมื่อนั่งผิดท่า</div>
+                                </label>
+                                <label class="alert-opt" data-alert="notification">
+                                    <input type="radio" name="alertType" value="notification" class="sr-only" style="position:absolute;opacity:0;">
+                                    <div class="alert-opt-title"><i class="ph ph-bell"></i> OS Alert</div>
+                                    <div class="alert-opt-desc">เด้งแจ้งเตือนผ่านหน้าต่างคอมพิวเตอร์</div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Threshold -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;border-top:1px solid rgba(91,138,245,0.08);">
+                            <div>
+                                <div style="font-size:13px;font-weight:600;color:#c8d0e8;">Delay Threshold</div>
+                                <div style="font-size:11px;color:#6b7aab;margin-top:4px;">เตือนเมื่อนั่งผิดท่าต่อเนื่องเกินเวลาที่เลือก</div>
+                            </div>
+                            <select id="setting-threshold" class="settings-select">
+                                <option value="3">3 วินาที</option>
+                                <option value="5" selected>5 วินาที</option>
+                                <option value="10">10 วินาที</option>
+                                <option value="15">15 วินาที</option>
+                                <option value="30">30 วินาที</option>
+                            </select>
+                        </div>
+
+                        <!-- Sensitivity -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;border-top:1px solid rgba(91,138,245,0.08);">
+                            <div>
+                                <div style="font-size:13px;font-weight:600;color:#c8d0e8;">Detection Sensitivity</div>
+                                <div style="font-size:11px;color:#6b7aab;margin-top:4px;">ความไวในการตรวจจับท่าผิดปกติ</div>
+                            </div>
+                            <select id="setting-sensitivity" class="settings-select">
+                                <option value="30">Low (30%)</option>
+                                <option value="45" selected>Medium (45%)</option>
+                                <option value="60">High (60%)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="padding:16px 22px;border-top:1px solid rgba(91,138,245,0.08);display:flex;justify-content:flex-end;">
+                        <button id="btn-save-settings" class="btn-primary" style="padding:10px 28px;font-size:13px;">
+                            บันทึกการตั้งค่า
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTS VIEW -->
+            <div id="view-reports" class="view-section" style="max-width:800px; margin:0 auto;">
+                <div class="card" style="padding:60px 40px; text-align:center; border:none; background:transparent;">
+<i class="ph ph-file-pdf" style="font-size:64px; color:#3b6ff0; margin-bottom:20px;"></i>                    <h2 style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#e2e6f3;margin:16px 0 8px;">Health Reports</h2>
+                    <p style="color:#6b7aab;font-size:13px;margin-bottom:28px;">ดาวน์โหลดรายงานพฤติกรรมการนั่งสรีระของคุณในรูปแบบ PDF</p>
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(91,138,245,0.1);border-radius:12px;padding:20px 24px;margin-bottom:24px;text-align:left;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div><div style="font-size:11px;color:#6b7aab;">วันนี้</div><div style="font-size:13px;font-weight:600;color:#c8d0e8;" id="report-date">—</div></div>
+                            <div><div style="font-size:11px;color:#6b7aab;">Posture Score</div><div style="font-size:13px;font-weight:600;color:#3b6ff0;">85%</div></div>
+                            <div><div style="font-size:11px;color:#6b7aab;">Monitor Time</div><div style="font-size:13px;font-weight:600;color:#c8d0e8;" id="report-time">0h 00m</div></div>
+                            <div><div style="font-size:11px;color:#6b7aab;">Alerts</div><div style="font-size:13px;font-weight:600;color:#ef4444;" id="report-alerts">0</div></div>
+                        </div>
+                    </div>
+                    <button id="btn-main-report" class="btn-primary" style="margin:0 auto;padding:13px 36px;">
+                        <i class="ph ph-download-simple"></i> Download Report (PDF)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FULL SCREEN ALERT OVERLAY -->
+<div id="full-alert">
+    <div class="alert-pill">
+        <i class="ph-fill ph-warning-circle" style="font-size:44px;color:white;"></i>
+        <div>
+            <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:white;">Ergonomic Alert!</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:3px;">กรุณายืดตัวตรงเพื่อรักษาระดับกระดูกสันหลัง</div>
+        </div>
+    </div>
+</div>
+
+<!-- PDF TEMPLATE -->
+<div id="pdf-template">
+    <h1>PosturePal Assessment Report</h1>
+    <div class="pdf-meta" id="pdf-meta">Generated: —</div>
+    <div class="pdf-section">
+        <h2>Employee Information</h2>
+        <div class="pdf-row"><span>Email</span><span class="pdf-val" id="pdf-user">—</span></div>
+        <div class="pdf-row"><span>Report Date</span><span class="pdf-val" id="pdf-date">—</span></div>
+    </div>
+    <div class="pdf-section">
+        <h2>Session Summary</h2>
+        <div class="pdf-row"><span>Active Monitor Time</span><span class="pdf-val" id="pdf-time">—</span></div>
+        <div class="pdf-row"><span>Corrective Alerts</span><span class="pdf-val" id="pdf-alerts">—</span></div>
+        <div class="pdf-row"><span>Posture Score</span><span class="pdf-val">85%</span></div>
+    </div>
+    <div class="pdf-section">
+        <h2>Recommendation</h2>
+        <p style="font-size:13px;color:#374151;line-height:1.7;">
+            ควรปรับท่านั่งเป็นระยะ ๆ ทุก 30–45 นาที ยืดกล้ามเนื้อคอและหลัง
+            ปรับระดับจอให้ตาอยู่ระดับเดียวกับขอบบนของหน้าจอ และรักษาระยะห่างจากจอ 50–70 ซม.
+        </p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const state = {
+        cameraRunning: false,
+        calibratedDist: null,
+        isBad: false,
+        badFrames: 0,
+        goodFrames: 0,
+        settings: { type: 'blur', threshold: 5, sensitivity: 45 },
+        stats: { alerts: 0, totalSecs: 0 },
+        timer: null,
+        user: 'employee@company.com',
+        alertActive: false,
+    };
+
+    // --- ELEMENTS ---
+    const $ = id => document.getElementById(id);
+    const els = {
+        auth: $('auth-screen'),
+        app: $('main-app'),
+        loginForm: $('login-form'),
+        navLinks: document.querySelectorAll('.nav-link'),
+        views: document.querySelectorAll('.view-section'),
+        pageTitle: $('page-title'),
+        contentArea: $('content-area'),
+        video: document.querySelector('.input_video'),
+        canvas: $('pose-canvas'),
+        toggleCam: $('btn-toggle-cam'),
+        calibrate: $('btn-calibrate'),
+        bgBlur: $('bg-blur-toggle'),
+        debug: $('debug-toggle'),
+        boost: $('low-light-boost'),
+        screenLight: $('screen-light-toggle'),
+        flash: $('screen-flash'),
+        scanLine: $('scan-line'),
+        camOverlay: $('cam-off-overlay'),
+        camLoading: $('cam-loading-text'),
+        statusRing: $('status-ring'),
+        statusIcon: $('live-status-icon'),
+        statusTitle: $('live-status-title'),
+        devVal: $('deviation-value'),
+        devBar: $('deviation-bar'),
+        dashTime: $('dash-monitor-time'),
+        dashAlerts: $('dash-alert-count'),
+        sessGood: $('sess-good'),
+        sessBad: $('sess-bad'),
+        alertOpts: document.querySelectorAll('.alert-opt'),
+        threshSel: $('setting-threshold'),
+        sensSel: $('setting-sensitivity'),
+        saveSettings: $('btn-save-settings'),
+        fullAlert: $('full-alert'),
+        btnPDF: $('btn-main-report'),
+        toast: $('toast'),
+        toastMsg: $('toast-msg'),
+        topDot: $('top-status-dot'),
+        topText: $('top-status-text'),
+    };
+
+    const ctx = els.canvas.getContext('2d');
+    let camera = null;
+
+    // --- AUTH ---
+    els.loginForm.addEventListener('submit', e => {
+        e.preventDefault();
+        state.user = $('user-email').value;
+        const name = state.user.split('@')[0];
+        $('user-name-display').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        $('user-email-display').textContent = state.user;
+        $('user-avatar').textContent = name.charAt(0).toUpperCase();
+        $('report-date').textContent = new Date().toLocaleDateString('th-TH');
+        els.auth.classList.add('hidden');
+        els.app.classList.remove('hidden');
+        initChart();
+    });
+
+    $('btn-logout').addEventListener('click', () => {
+        if(state.cameraRunning) stopCamera();
+        els.app.classList.add('hidden');
+        els.auth.classList.remove('hidden');
+    });
+
+    // --- NAVIGATION ---
+    const viewTitles = { dashboard:'แดชบอร์ด', monitoring:'กล้อง AI Vision', settings:'ตั้งค่าระบบเตือน', reports:'รายงานสุขภาพ' };
+    els.navLinks.forEach(link => {
+        link.addEventListener('click', e => {
+            e.preventDefault();
+            const view = link.getAttribute('data-view');
+            els.navLinks.forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+            els.views.forEach(v => v.classList.remove('active'));
+            $(`view-${view}`).classList.add('active');
+            els.pageTitle.textContent = viewTitles[view] || view;
+        });
+    });
+
+    // --- SETTINGS ---
+    els.alertOpts.forEach(opt => {
+        opt.addEventListener('click', () => {
+            els.alertOpts.forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            state.settings.type = opt.getAttribute('data-alert');
+            if(state.settings.type === 'notification' && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        });
+    });
+
+    els.saveSettings.addEventListener('click', () => {
+        state.settings.threshold = parseInt(els.threshSel.value);
+        state.settings.sensitivity = parseInt(els.sensSel.value);
+        showToast('บันทึกการตั้งค่าแล้ว');
+    });
+
+    // --- LIGHTING ---
+    els.boost.addEventListener('change', () => {});
+    els.screenLight.addEventListener('change', e => {
+        e.target.checked ? els.flash.classList.add('on') : els.flash.classList.remove('on');
+    });
+
+    // --- MEDIAPIPE ---
+    const pose = new Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({
+        modelComplexity: 1, smoothLandmarks: true,
+        enableSegmentation: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5
+    });
+
+    pose.onResults(results => {
+        const W = els.canvas.width, H = els.canvas.height;
+        ctx.save();
+        ctx.clearRect(0, 0, W, H);
+
+        if(els.boost.checked) ctx.filter = 'brightness(1.6) contrast(1.15)';
+
+        // Draw with privacy blur
+        if(els.bgBlur.checked && results.segmentationMask) {
+            ctx.drawImage(results.segmentationMask, 0, 0, W, H);
+            ctx.globalCompositeOperation = 'source-in';
+            ctx.drawImage(results.image, 0, 0, W, H);
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.filter = 'blur(14px) brightness(0.65)';
+            ctx.drawImage(results.image, 0, 0, W, H);
+            ctx.filter = 'none';
+            ctx.globalCompositeOperation = 'source-over';
+        } else {
+            ctx.drawImage(results.image, 0, 0, W, H);
+        }
+
+        if(results.poseLandmarks) {
+            const l = results.poseLandmarks;
+            drawConnectors(ctx, l, POSE_CONNECTIONS, { color: 'rgba(59,111,240,0.4)', lineWidth: 1.5 });
+
+            // Ear & shoulder dots
+            [7, 8, 11, 12].forEach(i => {
+                const p = l[i];
+                ctx.beginPath();
+                ctx.arc(p.x * W, p.y * H, 7, 0, 2 * Math.PI);
+                ctx.fillStyle = i < 10 ? '#ef4444' : '#10b981';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 2; ctx.stroke();
+
+                if(els.debug.checked) {
+                    ctx.save();
+                    ctx.scale(-1, 1);
+                    ctx.font = 'bold 10px DM Mono, monospace';
+                    ctx.fillStyle = 'white';
+                    const labels = {7:'L-Ear', 8:'R-Ear', 11:'L-Sh', 12:'R-Sh'};
+                    ctx.fillText(labels[i], -(p.x * W) + 12, p.y * H - 10);
+                    ctx.restore();
+                }
+            });
+
+            const nose = l[0], lSh = l[11], rSh = l[12];
+            const midShY = (lSh.y + rSh.y) / 2;
+            const d = midShY - nose.y;
+            window._poseD = d;
+
+            if(state.calibratedDist) {
+                let dev = (1 - (d / state.calibratedDist)) * 250;
+                dev = Math.max(0, Math.min(100, dev));
+                els.devVal.textContent = Math.round(dev) + '%';
+                els.devBar.style.width = dev + '%';
+
+                const isBadNow = dev > state.settings.sensitivity;
+                if(isBadNow) {
+                    state.isBad = true; state.badFrames++;
+                    els.sessBad.textContent = state.badFrames;
+                    els.devBar.style.background = dev > 70 ? '#ef4444' : '#f59e0b';
+                    if(state.badFrames === (state.settings.threshold * 10) && !state.alertActive) {
+                        triggerAlert();
+                    }
+                } else {
+                    state.isBad = false;
+                    if(state.badFrames > 0) state.goodFrames++;
+                    state.badFrames = 0;
+                    els.sessGood.textContent = state.goodFrames;
+                    els.devBar.style.background = '#10b981';
+                    if(state.alertActive) removeAlert();
+                }
+                updateStatus(dev);
+            } else {
+                setStatus('neutral', 'Awaiting Calibration');
+            }
+        }
+        ctx.restore();
+    });
+
+    // --- CAMERA ---
+    els.toggleCam.addEventListener('click', async () => {
+        if(!state.cameraRunning) {
+            await startCamera();
+        } else {
+            stopCamera();
+        }
+    });
+
+    async function startCamera() {
+        els.camLoading.style.display = 'block';
+        try {
+            // Set canvas size
+            els.canvas.width = 640; els.canvas.height = 480;
+            camera = new Camera(els.video, {
+                onFrame: async () => await pose.send({ image: els.video }),
+                width: 640, height: 480
+            });
+            await camera.start();
+            state.cameraRunning = true;
+            els.camOverlay.style.display = 'none';
+            els.scanLine.style.display = 'block';
+            els.camLoading.style.display = 'none';
+            els.toggleCam.innerHTML = '<i class="ph-bold ph-stop-circle"></i> หยุดระบบ';
+            els.toggleCam.classList.add('danger');
+            els.calibrate.disabled = false;
+            els.calibrate.removeAttribute('disabled');
+            els.topDot.classList.add('online');
+            els.topText.textContent = 'AI ACTIVE';
+            startTimer();
+        } catch(err) {
+            els.camLoading.style.display = 'none';
+            showToast('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาต Camera Permission');
+        }
+    }
+
+    function stopCamera() {
+        if(camera) camera.stop();
+        state.cameraRunning = false;
+        clearInterval(state.timer);
+        removeAlert();
+        els.camOverlay.style.display = 'flex';
+        els.scanLine.style.display = 'none';
+        els.toggleCam.innerHTML = '<i class="ph-bold ph-power"></i> เปิดกล้อง';
+        els.toggleCam.classList.remove('danger');
+        els.calibrate.disabled = true;
+        els.calibrate.setAttribute('disabled', '');
+        els.topDot.classList.remove('online');
+        els.topText.textContent = 'AI OFFLINE';
+        setStatus('neutral', 'Standby');
+        els.devVal.textContent = '0%';
+        els.devBar.style.width = '0%';
+    }
+
+    els.calibrate.addEventListener('click', () => {
+        if(window._poseD) {
+            state.calibratedDist = window._poseD;
+            showToast('Baseline ตั้งค่าแล้ว! ระบบพร้อมตรวจสอบ');
+            els.calibrate.innerHTML = '<i class="ph-bold ph-check"></i> Calibrated!';
+            setTimeout(() => {
+                els.calibrate.innerHTML = '<i class="ph-bold ph-crosshair"></i> ตั้งค่า Baseline';
+            }, 2500);
+        } else {
+            showToast('ไม่พบข้อมูล Pose กรุณายืนอยู่ในกรอบกล้อง');
+        }
+    });
+
+    // --- ALERT ---
+    function triggerAlert() {
+        state.alertActive = true;
+        state.stats.alerts++;
+        els.dashAlerts.textContent = state.stats.alerts;
+        $('report-alerts').textContent = state.stats.alerts;
+
+        if(state.settings.type === 'blur') {
+            els.contentArea.classList.add('app-nudge-blur');
+            els.fullAlert.classList.add('show');
+        } else {
+            if(Notification.permission === 'granted') {
+                new Notification('PosturePal 🚨', { body: 'กรุณายืดตัวตรง ท่านั่งของคุณไม่ถูกต้อง', icon: '' });
+            }
+        }
+    }
+
+    function removeAlert() {
+        state.alertActive = false;
+        els.contentArea.classList.remove('app-nudge-blur');
+        els.fullAlert.classList.remove('show');
+    }
+
+    // --- STATUS UI ---
+    function updateStatus(dev) {
+        if(dev < 20) setStatus('good', 'Optimal Posture');
+        else if(dev < state.settings.sensitivity) setStatus('warn', 'Mild Slouch');
+        else setStatus('bad', 'Risk Posture');
+    }
+
+    function setStatus(type, text) {
+        els.statusTitle.textContent = text;
+        els.statusRing.className = `status-ring ${type}`;
+        const configs = {
+            good: { cls: 'ph-check-circle', color: '#10b981' },
+            warn: { cls: 'ph-warning-circle', color: '#f59e0b' },
+            bad: { cls: 'ph-warning', color: '#ef4444' },
+            neutral: { cls: 'ph-minus', color: '#374151' },
+        };
+        const c = configs[type] || configs.neutral;
+        els.statusIcon.className = `ph-fill ${c.cls}`;
+        els.statusIcon.style.color = c.color;
+    }
+
+    // --- TIMER ---
+    function startTimer() {
+        clearInterval(state.timer);
+        state.timer = setInterval(() => {
+            if(!state.cameraRunning) return;
+            state.stats.totalSecs++;
+            const h = Math.floor(state.stats.totalSecs / 3600);
+            const m = Math.floor((state.stats.totalSecs % 3600) / 60);
+            const timeStr = `${h}h ${String(m).padStart(2,'0')}m`;
+            els.dashTime.textContent = timeStr;
+            $('report-time').textContent = timeStr;
+        }, 1000);
+    }
+
+    // --- TOAST ---
+    let toastTimer;
+    function showToast(msg) {
+        els.toastMsg.textContent = msg;
+        els.toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => els.toast.classList.remove('show'), 3000);
+    }
+
+    // --- CHART ---
+    function initChart() {
+        const chartCtx = $('corpChart').getContext('2d');
+        new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+                datasets: [{
+                    label: 'Posture Score',
+                    data: [68, 74, 71, 80, 82, 78, 85],
+                    borderColor: '#3b6ff0',
+                    backgroundColor: 'rgba(59,111,240,0.08)',
+                    borderWidth: 2.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#3b6ff0',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#141d3b',
+                        titleColor: '#6b7aab',
+                        bodyColor: '#e2e6f3',
+                        borderColor: 'rgba(91,138,245,0.2)',
+                        borderWidth: 1,
+                        padding: 12,
+                    }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(91,138,245,0.07)' }, ticks: { color: '#6b7aab', font: { family: 'DM Mono', size: 11 } } },
+                    y: { min: 50, max: 100, grid: { color: 'rgba(91,138,245,0.07)' }, ticks: { color: '#6b7aab', font: { family: 'DM Mono', size: 11 } } }
+                }
+            }
+        });
+    }
+
+    // --- PDF ---
+    els.btnPDF.addEventListener('click', async () => {
+        const now = new Date().toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' });
+        $('pdf-user').textContent = state.user;
+        $('pdf-date').textContent = now;
+        $('pdf-meta').textContent = `Generated: ${now}`;
+        $('pdf-time').textContent = els.dashTime.textContent;
+        $('pdf-alerts').textContent = state.stats.alerts;
+        showToast('กำลังสร้างรายงาน PDF...');
+        try {
+            const canvas = await html2canvas($('pdf-template'), { scale: 2, backgroundColor: '#ffffff' });
+            const pdf = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+            const imgData = canvas.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+            pdf.save(`PosturePal_Report_${state.user}.pdf`);
+            showToast('ดาวน์โหลดรายงานแล้ว!');
+        } catch(e) {
+            showToast('เกิดข้อผิดพลาดในการสร้าง PDF');
+        }
+    });
+
+});
+</script>
+</body>
+</html>
